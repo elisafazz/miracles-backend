@@ -14,11 +14,14 @@ function getProvider() {
   const rawKey = Buffer.from(process.env.APNS_KEY_BASE64 || '', 'base64').toString('utf8')
   provider = new apn.Provider({
     token: {
-      key: Buffer.from(rawKey, 'utf8'),
+      // node-apn 7.x accepts the PEM string directly; no need to re-wrap in Buffer.
+      key: rawKey,
       keyId: process.env.APNS_KEY_ID,
       teamId: process.env.APNS_TEAM_ID,
     },
-    production: process.env.APNS_PRODUCTION === 'true',
+    // Default to production: TestFlight and App Store builds both use production
+    // APNs tokens. Set APNS_PRODUCTION=false explicitly only for local/sandbox testing.
+    production: process.env.APNS_PRODUCTION !== 'false',
   })
   return provider
 }
@@ -45,6 +48,10 @@ module.exports = async function handler(req, res) {
 
   const note = new apn.Notification()
   note.expiry = Math.floor(Date.now() / 1000) + 3600 // expire in 1 hour
+  // Intentional: badge=0 means this push doesn't change the displayed badge.
+  // The iOS app reconciles its own badge from `delivered.count` on app activation
+  // (see ContentView.swift's onChange(of: scenePhase)). The server has no
+  // per-recipient unread state to compute a meaningful badge total.
   note.badge = 0
   note.sound = 'default'
   note.alert = { title, body }
@@ -56,8 +63,11 @@ module.exports = async function handler(req, res) {
 
     if (result.failed.length > 0) {
       const err = result.failed[0].error ?? result.failed[0].response
-      console.error('[push] APNs failure:', JSON.stringify(err))
-      return res.status(502).json({ error: 'APNs delivery failed', detail: err })
+      // Defensive: APNs error objects can carry circular refs that break JSON.stringify.
+      let errLog
+      try { errLog = JSON.stringify(err) } catch { errLog = String(err) }
+      console.error('[push] APNs failure:', errLog)
+      return res.status(502).json({ error: 'APNs delivery failed', detail: errLog })
     }
 
     return res.status(200).json({ ok: true, sent: result.sent.length })
