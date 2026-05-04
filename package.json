@@ -1,0 +1,16 @@
+{
+  "name": "miracles-backend",
+  "version": "1.0.0",
+  "description": "APNs push + Anthropic proxy backend for the Miracles iOS app (mirrors sunzzari-backend).",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@parse/node-apn": "^7.1.0"
+  }
+}
